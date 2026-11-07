@@ -6,7 +6,7 @@ A simple Texas Hold'em poker game playable in a web browser, built entirely with
 
 *   **Texas Hold'em Gameplay:** Implements the basic flow of Texas Hold'em (Blinds, Preflop, Flop, Turn, River, Showdown).
 *   **1 Human vs 3 AI Players:** Play against three computer-controlled opponents.
-*   **Basic AI:** The AI players have a simple logic for folding, calling, checking, and making basic bets/raises.
+*   **Card-aware AI:** Bots consider starting-hand strength and dealer position before the flop, then estimate equity from their own cards and the board. They compare the cost of calling with the contestable pot and size legal value bets/raises.
 *   **Visual Interface:** A poker table layout created with CSS, showing player pods, chips, community cards, and player hands (human's visible, AI's hidden until showdown).
 *   **Action Controls:** Buttons for Fold, Check/Call, Bet/Raise, and an input field for bet amounts.
 *   **Quick Bet Buttons:** Buttons for quick betting actions (Min, 1/2 Pot, Pot, Max/All-in).
@@ -83,7 +83,17 @@ The game still runs without dependencies or a build step. To run the automated t
 npm test
 ```
 
-The suite covers betting validation, blinds, all-ins, reopening raises, side pots, refunds, ties, actual-card showdowns, and chip conservation across simulated games. GitHub Actions runs it on pushes and pull requests.
+The suite covers betting validation, blinds, all-ins, reopening raises, side pots, refunds, ties, actual-card showdowns, card-aware decisions, hidden-information isolation, and chip conservation across simulated games. GitHub Actions runs it on pushes and pull requests.
+
+## How the bots decide
+
+`static/js/poker-ai.js` contains the strategy separately from the game engine. Before the flop, a heuristic scores pairs, high cards, suited cards, connectivity, dealer position, and the number of live opponents.
+
+After the flop, each decision uses 96 Monte Carlo samples by default. Each sample completes the community board and deals hypothetical opponent hands without reusing known cards. Wins count as one and ties as a fractional share. This captures made hands and drawing potential without reading actual opponent cards, burn cards, or the real deck.
+
+The strategy receives a copy of its own cards and public information only. Calls account for the available stack and exclude contributions above the bot's maximum eligible contribution. Value bets respect the engine's minimum raise, stack limit, and reopening rules. Weak hands check for free or fold when calling is too expensive.
+
+These estimates assume uniformly random opponent hands; they do not model opponent betting ranges, fold equity, or the exact expected payout across multiple side pots. Preflop scores are heuristics rather than simulated winning probabilities. Bots use the same strategy and do not yet adapt to opponents or deliberately bluff. No external API, model service, dependency, or network request is needed.
 
 ## Contributing
 

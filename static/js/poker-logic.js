@@ -955,7 +955,7 @@ class PokerGame {
           setTimeout(() => this.startNewHand(), 3000);
      }
 
-    // --- Lógica da IA (Muito Básica) ---
+    // --- IA baseada nas cartas e em informações públicas ---
     _checkAndTriggerAIAction() {
         if (this.currentPhase === 'idle' || this.currentPhase === 'showdown' || this.currentPhase === 'gameOver') return;
         const currentPlayer = this.players[this.currentPlayerIndex];
@@ -969,36 +969,37 @@ class PokerGame {
         }
     }
 
-    _performAIAction(player) {
-        const amountToCall = this.currentBet - player.totalBetInRound;
-        const callCostPercentage = player.chips > 0 ? (amountToCall / (player.chips + player.totalBetInRound)) * 100 : 100;
+    _getAIObservation(player) {
+        const publicPlayer = p => ({
+            id: p.id,
+            chips: p.chips,
+            status: p.status,
+            totalBetInRound: p.totalBetInRound,
+            totalBetInHand: p.totalBetInHand
+        });
+        const copyCard = c => ({ rank: c.rank, suit: c.suit, value: c.value });
+        return {
+            player: { ...publicPlayer(player), canRaise: this.canPlayerRaise(player) },
+            players: this.players.map(publicPlayer),
+            hand: player.hand.map(copyCard),
+            communityCards: this.communityCards.map(copyCard),
+            dealerId: this.players[this.dealerButtonIndex]?.id,
+            currentBet: this.currentBet,
+            minRaise: this.minRaise,
+            bigBlindAmount: BIG_BLIND_AMOUNT,
+            pot: this.pot
+        };
+    }
 
-        if (amountToCall <= 0) { // Pode dar Check
-            if (player.chips > BIG_BLIND_AMOUNT && Math.random() < 0.25) {
-                 const betAmount = Math.min(player.chips, Math.max(BIG_BLIND_AMOUNT, Math.floor(this.pot * 0.5)));
-                 if (this.canPlayerRaise(player)) {
-                      this.handleAction(player.id, this.currentBet === 0 ? 'bet' : 'raise', this.currentBet + betAmount);
-                  } else this.handleAction(player.id, 'check');
-            } else { this.handleAction(player.id, 'check'); }
-        } else { // Precisa dar Call, Fold ou Raise
-            if (amountToCall >= player.chips) { // Call é All-in
-                 if (Math.random() < 0.5) this.handleAction(player.id, 'call');
-                 else this.handleAction(player.id, 'fold');
-            } else if (callCostPercentage > 40 && Math.random() < 0.7) { // Custo alto
-                this.handleAction(player.id, 'fold');
-            } else if (callCostPercentage > 15) { // Custo médio
-                const rand = Math.random();
-                if (rand < 0.3) this.handleAction(player.id, 'fold');
-                else if (rand < 0.85 && this.canPlayerRaise(player) && player.chips >= amountToCall + this.minRaise) this.handleAction(player.id, 'call');
-                else if (this.canPlayerRaise(player) && player.chips >= amountToCall + this.minRaise) {
-                     const totalRaise = this.currentBet + this.minRaise; this.handleAction(player.id, 'raise', totalRaise);
-                } else this.handleAction(player.id, 'call'); // Não pode raise, só call
-            } else { // Custo baixo
-                if (this.canPlayerRaise(player) && player.chips >= amountToCall + this.minRaise && Math.random() < 0.15) {
-                     const totalRaise = this.currentBet + this.minRaise; this.handleAction(player.id, 'raise', totalRaise);
-                } else this.handleAction(player.id, 'call');
-            }
+    _performAIAction(player) {
+        if (this._actionPending || !['preflop', 'flop', 'turn', 'river'].includes(this.currentPhase) ||
+            this.players[this.currentPlayerIndex]?.id !== player.id || player.status !== 'active') return;
+        if (!this._aiStrategy) {
+            const Strategy = typeof PokerAI !== 'undefined' ? PokerAI : require('./poker-ai.js').PokerAI;
+            this._aiStrategy = new Strategy(cards => this._evaluateBestHand(cards));
         }
+        const decision = this._aiStrategy.decide(this._getAIObservation(player));
+        return this.handleAction(player.id, decision.action, decision.amount);
     }
 
     // --- Funções de Utilidade / Acesso ---
