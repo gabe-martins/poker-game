@@ -243,7 +243,7 @@ document.addEventListener('DOMContentLoaded', () => {
                  let canBetOrRaiseAction = true;
                  let minBetOrRaiseValue = 0; // Será calculado abaixo
 
-                 if (canCheck) { // Pode dar check, então a ação seria BET
+                 if (gameState.currentBet === 0) { // Sem aposta aberta: BET
                       btnBetRaise.textContent = 'Bet';
                       // Mínimo para Bet: BB ou o minRaise atual (o que for maior), limitado pelo stack
                       minBetOrRaiseValue = Math.max(BIG_BLIND_AMOUNT, gameState.minRaise); // Precisa de BIG_BLIND_AMOUNT definido ou vindo do game state
@@ -269,6 +269,7 @@ document.addEventListener('DOMContentLoaded', () => {
                        }
                  }
 
+                 canBetOrRaiseAction = canBetOrRaiseAction && humanPlayer.canRaise;
                  btnBetRaise.disabled = !canBetOrRaiseAction;
                  betAmountInput.disabled = !canBetOrRaiseAction;
                  if(canBetOrRaiseAction) {
@@ -285,7 +286,7 @@ document.addEventListener('DOMContentLoaded', () => {
                  btnHalfPot.disabled = !canBetOrRaiseAction;
                  btnPotBet.disabled = !canBetOrRaiseAction;
                  // Max (All-in) está sempre habilitado se puder agir e tiver fichas
-                 btnMaxBet.disabled = !(playerChips > 0);
+                 btnMaxBet.disabled = !(playerChips > 0 && (canBetOrRaiseAction || amountToCall >= playerChips));
 
                  // Se não puder apostar/aumentar, mas puder dar check (ex: BB pré-flop sem raise)
                  if (!canBetOrRaiseAction && canCheck && playerChips > 0) {
@@ -455,7 +456,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     betSize = Math.max(betSize, minLegalTotalAmount);
                     targetTotalAmount = betSize;
                 } else { // Se for raise
-                    const potSizeForRaiseCalc = currentPot + (amountToCall * 2); // Pote + Call + Aposta anterior que gerou o call
+                    const potSizeForRaiseCalc = potAfterCall; // Pote + Call + Aposta anterior que gerou o call
                     let raiseAmount = (type === 'pot') ? potSizeForRaiseCalc : Math.floor(potSizeForRaiseCalc * 0.5);
                     // Garante que o raise seja pelo menos o mínimo adicional
                      raiseAmount = Math.max(raiseAmount, minAdditionalRaiseAmount);
@@ -497,6 +498,12 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error("Não foi possível calcular um valor válido para a aposta rápida:", type);
             return;
         }
+        const humanPlayer = game.players.find(p => p.isHuman);
+        if (type === 'max' && amount <= game.currentBet) {
+            game.performHumanAction('call');
+            return;
+        }
+        if (!humanPlayer || !game.canPlayerRaise(humanPlayer)) return;
         const isBetAction = game.currentBet === 0;
         const actionType = isBetAction ? 'bet' : 'raise';
         betAmountInput.value = amount; // Atualiza input para feedback
