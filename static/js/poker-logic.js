@@ -93,6 +93,8 @@ class Player {
         this.hand = []; // Cartas na mão (Card objects)
         this.currentBet = 0; // Aposta na ação atual
         this.totalBetInRound = 0; // Total apostado nesta FASE (preflop, flop, etc.)
+        this.totalBetInHand = 0; // Inclui blinds e todas as fases, inclusive após fold.
+        this.lastActedBet = null; // Aposta enfrentada na última ação; controla reabertura.
         this.status = 'waiting'; // waiting, active, folded, all-in, out
         this.evaluationResult = null; // Resultado de _evaluateBestHand { rankIndex, hand, description, significantRanks }
         this.hasActedInRound = false; // Flag para controle de fim de rodada
@@ -103,6 +105,8 @@ class Player {
         this.hand = [];
         this.currentBet = 0;
         this.totalBetInRound = 0;
+        this.totalBetInHand = 0;
+        this.lastActedBet = null;
         this.evaluationResult = null;
         this.hasActedInRound = false;
         this.isLastAggressor = false;
@@ -148,7 +152,8 @@ class PokerGame {
         this.currentPhase = 'idle'; // idle, preflop, flop, turn, river, showdown, gameOver
         this.log = [];
         this.uiUpdateCallback = uiUpdateCallback;
-        this._subPots = []; // Não implementado em detalhe
+        this._subPots = [];
+        this._actionPending = false;
         this._roundActionCounter = 0;
         this._lastRaiserId = -1; // ID do último a fazer bet/raise
     }
@@ -193,6 +198,7 @@ class PokerGame {
         this.currentBet = 0;
         this.minRaise = BIG_BLIND_AMOUNT;
         this._subPots = [];
+        this._actionPending = false;
         this._roundActionCounter = 0;
         this._lastRaiserId = -1;
 
@@ -207,7 +213,9 @@ class PokerGame {
         }
 
         this.dealerButtonIndex = this._getNextPlayerIndex(this.dealerButtonIndex, activePlayersInGame);
-        const sbIndex = this._getNextPlayerIndex(this.dealerButtonIndex, activePlayersInGame);
+        const sbIndex = activePlayersInGame.length === 2
+            ? this.dealerButtonIndex
+            : this._getNextPlayerIndex(this.dealerButtonIndex, activePlayersInGame);
         const bbIndex = this._getNextPlayerIndex(sbIndex, activePlayersInGame);
 
         this._postBlind(sbIndex, SMALL_BLIND_AMOUNT, "Small Blind");
@@ -222,7 +230,7 @@ class PokerGame {
 
         activePlayersInGame.forEach(p => {
             if (p.status !== 'all-in' && p.status !== 'out') p.prepareToAction();
-            p.hasActedInRound = (p.id === this.players[sbIndex]?.id || p.id === this.players[bbIndex]?.id);
+            p.hasActedInRound = false; // Postar blind não consome a vez de agir.
         });
 
         this.currentPhase = 'preflop';
@@ -266,6 +274,7 @@ class PokerGame {
         const blindAmount = player.removeChips(amount);
         player.currentBet = blindAmount;
         player.totalBetInRound = blindAmount;
+        player.totalBetInHand += blindAmount;
         this.pot += blindAmount;
         this._logEvent(`${player.name} posta ${blindType} de ${blindAmount}`);
         if (player.chips === 0) {
@@ -300,6 +309,14 @@ class PokerGame {
     handleAction(playerId, action, amount = 0) {
         const player = this.players.find(p => p.id === playerId);
         const currentPlayer = this.players[this.currentPlayerIndex];
+        if (this._actionPending || !['preflop', 'flop', 'turn', 'river'].includes(this.currentPhase)) {
+            return false;
+        }
+        if (typeof action !== 'string' ||
+            (['bet', 'raise'].includes(action.toLowerCase()) && (!Number.isSafeInteger(amount) || amount <= 0))) {
+            this._logEvent("Ação inválida: aposta deve ser um inteiro positivo.");
+            return false;
+        }
 
         if (!player || player.id !== currentPlayer?.id) {
             this._logEvent(`Ação inválida: Não é a vez de ${player?.name ?? 'ID desconhecido'}. É a vez de ${currentPlayer?.name ?? 'Ninguém'}.`);
@@ -345,6 +362,7 @@ class PokerGame {
                     player.removeChips(callAmount);
                     player.currentBet = callAmount;
                     player.totalBetInRound += callAmount;
+                    player.totalBetInHand += callAmount;
                     this.pot += callAmount;
                     actionDescription = `${player.name} paga (call) ${callAmount}.`;
                     if (player.chips === 0) {
@@ -356,9 +374,12 @@ class PokerGame {
                 break;
 
             case 'bet':
-                const isEffectivelyCheck = amountToCall <= 0;
+                const isEffectivelyCheck = this.currentBet === 0;
                 if (!isEffectivelyCheck) {
                     actionDescription = `Ação inválida: ${player.name} não pode apostar (bet), use call ou raise.`;
+                    performMove = false;
+                } else if (!this.canPlayerRaise(player)) {
+                    actionDescription = "Ação inválida: aposta não permitida.";
                     performMove = false;
                 } else if (amount <= 0) {
                     actionDescription = `Ação inválida: ${player.name} - valor da aposta deve ser positivo.`;
@@ -373,9 +394,10 @@ class PokerGame {
                     const betAmount = player.removeChips(amount);
                     player.currentBet = betAmount;
                     player.totalBetInRound = betAmount;
+                    player.totalBetInHand += betAmount;
                     this.pot += betAmount;
                     this.currentBet = player.totalBetInRound;
-                    this.minRaise = betAmount; // A própria aposta define o próximo raise mínimo ADICIONAL
+                    this.minRaise = Math.max(this.minRaise, betAmount);
                     this._lastRaiserId = player.id; // <<< Define quem foi o último agressor
                     this.players.forEach(p => p.isLastAggressor = (p.id === player.id)); // <<< Atualiza flag em todos
                     player.isLastAggressor = true; // Garante que o próprio jogador saiba
@@ -390,16 +412,19 @@ class PokerGame {
 
             case 'raise':
                 const totalAfterRaise = amount;
-                const raiseAmount = totalAfterRaise - player.totalBetInRound; // Quanto a mais está colocando
-                const amountNeeded = amountToCall + raiseAmount; // Total a ser adicionado nesta jogada
+                const raiseAmount = totalAfterRaise - this.currentBet;
+                const amountNeeded = totalAfterRaise - player.totalBetInRound;
 
-                if (amountToCall <= 0) {
+                if (this.currentBet === 0) {
                     actionDescription = `Ação inválida: ${player.name} não pode dar raise, use bet.`;
+                    performMove = false;
+                } else if (!this.canPlayerRaise(player)) {
+                    actionDescription = "Ação inválida: aumento não permitido ou ação não reaberta.";
                     performMove = false;
                 } else if (raiseAmount <= 0) {
                     actionDescription = `Ação inválida: ${player.name} - o valor do raise (${totalAfterRaise}) deve ser maior que a aposta atual (${player.totalBetInRound}).`;
                     performMove = false;
-                 } else if (raiseAmount < this.minRaise && player.chips > amountNeeded) { // Permite all-in menor
+                  } else if (raiseAmount < this.minRaise && player.chips !== amountNeeded) {
                      actionDescription = `Ação inválida: ${player.name} - aumento mínimo (raise) precisa ser de ${this.minRaise} a mais (totalizando ${this.currentBet + this.minRaise}). Tentou aumentar ${raiseAmount}.`;
                      performMove = false;
                  } else if (amountNeeded > player.chips) {
@@ -409,9 +434,10 @@ class PokerGame {
                     player.removeChips(amountNeeded);
                     player.currentBet = amountNeeded;
                     player.totalBetInRound = totalAfterRaise;
+                    player.totalBetInHand += amountNeeded;
                     this.pot += amountNeeded;
                     this.currentBet = player.totalBetInRound;
-                    this.minRaise = raiseAmount; // O valor ADICIONAL do raise define o próximo minRaise
+                    if (raiseAmount >= this.minRaise) this.minRaise = raiseAmount;
                     this._lastRaiserId = player.id; // <<< Define quem foi o último agressor
                      this.players.forEach(p => p.isLastAggressor = (p.id === player.id)); // <<< Atualiza flag em todos
                      player.isLastAggressor = true; // Garante que o próprio jogador saiba
@@ -434,10 +460,15 @@ class PokerGame {
 
         if (isValidAction) {
             player.hasActedInRound = true;
+            player.lastActedBet = this.currentBet;
             this._roundActionCounter++;
             if (performMove) {
                  // Adia a chamada para _moveToNextPlayer para garantir que a UI possa atualizar ANTES
-                 setTimeout(() => this._moveToNextPlayer(), 50); // Pequeno delay
+                  this._actionPending = true;
+                  setTimeout(() => {
+                      this._actionPending = false;
+                      this._moveToNextPlayer();
+                  }, 50);
                  // Atualiza a UI imediatamente para mostrar a ação do jogador atual
                  this._triggerUIUpdate();
             } else {
@@ -521,59 +552,24 @@ class PokerGame {
         }
     }
 
+    canPlayerRaise(player) {
+        const hasOpponent = this.players.some(p => p.id !== player.id && p.status === 'active' && p.chips > 0);
+        const actionReopened = player.lastActedBet === null || player.lastActedBet === 0 ||
+            this.currentBet - player.lastActedBet >= this.minRaise;
+        return player.status === 'active' && hasOpponent && actionReopened &&
+            player.chips + player.totalBetInRound > this.currentBet;
+    }
+
     _checkBettingRoundEnd() {
         const playersInHand = this._getPlayersInHand();
-        const actingPlayers = playersInHand.filter(p => p.status !== 'all-in'); // Que podem tomar decisões
-
-        if (actingPlayers.length < 2) {
-            if (playersInHand.length > 1) {
-                 this._logEvent("Rodada de apostas encerrada (jogadores restantes estão all-in ou só há um ativo).");
-                 return true;
-            } else {
-                 return true; // Mão já acabou, _moveToNextPlayer tratará
-            }
+        if (playersInHand.length <= 1) return true;
+        const actingPlayers = this._getActingPlayers();
+        if (actingPlayers.length === 0) return true;
+        if (actingPlayers.length === 1) {
+            // O último jogador ainda precisa decidir se paga o all-in ou desiste.
+            return actingPlayers[0].totalBetInRound >= this.currentBet;
         }
-
-        // Verifica se todos que podem agir já agiram E igualaram a aposta máxima
-        const highestBetInRound = this.currentBet; // A aposta a ser coberta
-        const allEligibleActedAndMatched = actingPlayers.every(p =>
-               p.hasActedInRound && p.totalBetInRound === highestBetInRound
-        );
-
-        // A rodada só pode terminar se houve aposta ou se todos deram check/passaram
-        const bettingOccurred = highestBetInRound > 0;
-        const allCheckedAround = highestBetInRound === 0 && actingPlayers.every(p => p.hasActedInRound);
-
-        // Condição especial pré-flop: BB pode dar check para encerrar se ninguém aumentou
-        const isPreflop = this.currentPhase === 'preflop';
-        const currentPlayer = this.players[this.currentPlayerIndex];
-        const bbCanEndRoundWithCheck = isPreflop &&
-                                       currentPlayer?.totalBetInRound === BIG_BLIND_AMOUNT && // É o BB?
-                                       highestBetInRound === BIG_BLIND_AMOUNT && // Ninguém aumentou?
-                                       actingPlayers.every(p => p.hasActedInRound); // Todos já agiram?
-
-
-        if ((bettingOccurred && allEligibleActedAndMatched) || allCheckedAround || bbCanEndRoundWithCheck ) {
-            // Última verificação: Se o último jogador a agir foi o agressor (bet/raise),
-            // a rodada NÃO termina ainda, a menos que todos os outros estejam all-in/folded.
-            // Isso permite que a ação dê uma volta completa.
-            // Usamos _lastRaiserId para saber quem foi o último a fazer bet/raise.
-            const lastPlayer = this.players.find(p => p.id === this._lastRaiserId);
-
-            // Se houve um agressor nesta rodada e a ação AINDA NÃO voltou para ele (ou para quem está logo após ele)
-            // E ainda há mais de um jogador ativo
-            // -> a rodada NÃO acabou.
-
-            // Simplificação: A rodada termina se:
-            // 1. Todos ativos igualaram a aposta atual (this.currentBet)
-            // 2. E todos ativos já agiram (p.hasActedInRound)
-            // (A lógica de _moveToNextPlayer garante a volta completa)
-
-            this._logEvent("Todos igualaram ou estão all-in/folded. Rodada de apostas encerrada.");
-            return true;
-        }
-
-        return false;
+        return actingPlayers.every(p => p.hasActedInRound && p.totalBetInRound === this.currentBet);
     }
 
 
@@ -581,15 +577,15 @@ class PokerGame {
         this._logEvent(`--- Fim da Rodada de Apostas (${this.currentPhase}) ---`);
         this._logEvent(`Pote Total: ${this.pot}`);
 
-        // Coleta apostas da rodada (importante para side pots no futuro)
-        // Por enquanto, apenas reseta para a próxima
+        // O total da mão é preservado separadamente para os side pots.
         this.currentBet = 0;
         this.minRaise = BIG_BLIND_AMOUNT;
         this._roundActionCounter = 0;
         this._lastRaiserId = -1;
         this.players.forEach(p => {
             p.currentBet = 0;
-            // NÃO zerar totalBetInRound aqui - pode ser útil para side pots
+            p.totalBetInRound = 0;
+            p.lastActedBet = null;
             p.hasActedInRound = false;
             p.isLastAggressor = false;
         });
@@ -732,44 +728,12 @@ class PokerGame {
         }
 
         this._logEvent("Revelando mãos e avaliando:");
-        let overallBestEval = null;
-
         contenders.forEach(player => {
-            const allSevenCards = [...player.hand, ...this.communityCards];
-            // Avalia a melhor mão E armazena o resultado no jogador
-            player.evaluationResult = this._evaluateBestHand(allSevenCards);
-
-            if (player.evaluationResult.rankIndex === -1) {
-                 this._logEvent(`${player.name}: Erro ao avaliar mão.`);
-                 return; // Pula jogador com erro
-            }
-
-            this._logEvent(`${player.name}: Mão [${player.hand.map(c=>c.toString()).join(', ')}] -> ${player.evaluationResult.description} (${player.evaluationResult.hand ? player.evaluationResult.hand.map(c=>c.toString()).join(', ') : 'N/A'})`);
-
-             // Acompanha a melhor avaliação geral encontrada
-             if (!overallBestEval ||
-                 player.evaluationResult.rankIndex > overallBestEval.rankIndex ||
-                 (player.evaluationResult.rankIndex === overallBestEval.rankIndex &&
-                  this._compareSignificantRanks(player.evaluationResult.significantRanks, overallBestEval.significantRanks) > 0))
-             {
-                  overallBestEval = player.evaluationResult;
-             }
+            player.evaluationResult = this._evaluateBestHand([...player.hand, ...this.communityCards]);
+            this._logEvent(`${player.name}: ${player.evaluationResult.description}`);
         });
 
-        if (!overallBestEval) {
-             this._logEvent("Erro: Não foi possível determinar a melhor mão.");
-              setTimeout(() => this.startNewHand(), 5000);
-             return;
-        }
-
-        // Filtra os vencedores (aqueles cuja mão iguala a melhor avaliação)
-        const winners = contenders.filter(player =>
-             player.evaluationResult &&
-             player.evaluationResult.rankIndex === overallBestEval.rankIndex &&
-             this._compareSignificantRanks(player.evaluationResult.significantRanks, overallBestEval.significantRanks) === 0
-        );
-
-        this._distributePot(winners);
+        this._distributePot();
         this._triggerUIUpdate(); // Atualiza UI para mostrar mãos finais/vencedores
 
         this._logEvent("Próxima mão em 5 segundos...");
@@ -910,25 +874,71 @@ class PokerGame {
      }
 
     // --- Distribuição do Pote ---
-     _distributePot(winners) {
-         if (winners.length === 0) {
-             this._logEvent("Erro: Nenhum vencedor para distribuir o pote.");
-             this.pot = 0;
-             return;
-         }
-         // Implementação MUITO simplificada sem side pots
-         const totalWinners = winners.length;
-         const share = Math.floor(this.pot / totalWinners);
-         let remainder = this.pot % totalWinners;
-         this._logEvent(`Pote de ${this.pot} dividido entre ${totalWinners} vencedor(es):`);
-         winners.forEach((winner) => {
-             const amountWon = share + (remainder > 0 ? 1 : 0);
-             winner.addChips(amountWon);
-             this._logEvent(`- ${winner.name} (${winner.evaluationResult?.description}) ganha ${amountWon}`);
-             if (remainder > 0) remainder--;
-         });
-         this.pot = 0;
-     }
+    _buildSidePots() {
+        const levels = [...new Set(this.players.map(p => p.totalBetInHand).filter(n => n > 0))]
+            .sort((a, b) => a - b);
+        let previous = 0;
+        return levels.map(level => {
+            const contributors = this.players.filter(p => p.totalBetInHand >= level);
+            const pot = {
+                amount: (level - previous) * contributors.length,
+                eligiblePlayerIds: contributors.filter(p => p.status !== 'folded' && p.status !== 'out').map(p => p.id),
+                // Uma camada com só um contribuinte é uma aposta não coberta.
+                refundPlayerId: contributors.length === 1 ? contributors[0].id : null
+            };
+            previous = level;
+            return pot;
+        });
+    }
+
+    _distributePot() {
+        const pots = this._buildSidePots();
+        if (pots.reduce((sum, pot) => sum + pot.amount, 0) !== this.pot) {
+            throw new Error('Pote não corresponde às contribuições da mão.');
+        }
+        // Calcula todos os pagamentos antes de alterar saldos.
+        const payouts = new Map(this.players.map(p => [p.id, 0]));
+        for (const pot of pots) {
+            if (pot.refundPlayerId !== null) {
+                payouts.set(pot.refundPlayerId, payouts.get(pot.refundPlayerId) + pot.amount);
+                pot.winnerIds = [];
+                continue;
+            }
+            const eligible = this.players.filter(p => pot.eligiblePlayerIds.includes(p.id));
+            if (eligible.length === 0 || eligible.some(p => !p.evaluationResult || p.evaluationResult.rankIndex < 0)) {
+                throw new Error('Não foi possível avaliar os jogadores elegíveis ao pote.');
+            }
+            const compare = (a, b) => a.evaluationResult.rankIndex - b.evaluationResult.rankIndex ||
+                this._compareSignificantRanks(a.evaluationResult.significantRanks, b.evaluationResult.significantRanks);
+            const best = eligible.reduce((a, b) => compare(a, b) >= 0 ? a : b);
+            const winners = eligible.filter(p => compare(p, best) === 0);
+            // Fichas indivisíveis vão ao primeiro vencedor à esquerda do dealer.
+            const seat = p => (this.players.indexOf(p) - this.dealerButtonIndex - 1 + this.players.length) % this.players.length;
+            winners.sort((a, b) => seat(a) - seat(b));
+            pot.winnerIds = winners.map(p => p.id);
+            const share = Math.floor(pot.amount / winners.length);
+            const remainder = pot.amount % winners.length;
+            winners.forEach((p, i) => payouts.set(p.id, payouts.get(p.id) + share + (i < remainder ? 1 : 0)));
+        }
+        this._subPots = pots;
+        pots.forEach((pot, index) => {
+            if (pot.refundPlayerId !== null) {
+                const player = this.players.find(p => p.id === pot.refundPlayerId);
+                this._logEvent(`Aposta não coberta: ${pot.amount} devolvidos a ${player.name}.`);
+            } else {
+                const names = pot.winnerIds.map(id => this.players.find(p => p.id === id).name).join(', ');
+                this._logEvent(`${index === 0 ? 'Pote principal' : 'Side pot ' + index}: ${pot.amount} para ${names}.`);
+            }
+        });
+        this.players.forEach(p => {
+            const amount = payouts.get(p.id);
+            if (amount > 0) {
+                p.addChips(amount);
+                this._logEvent(`${p.name} recebe ${amount} dos potes/apostas não cobertas.`);
+            }
+        });
+        this.pot = 0;
+    }
 
      _awardPotToWinner(winners) {
          if (winners && winners.length > 0) {
@@ -966,7 +976,9 @@ class PokerGame {
         if (amountToCall <= 0) { // Pode dar Check
             if (player.chips > BIG_BLIND_AMOUNT && Math.random() < 0.25) {
                  const betAmount = Math.min(player.chips, Math.max(BIG_BLIND_AMOUNT, Math.floor(this.pot * 0.5)));
-                 this.handleAction(player.id, 'bet', betAmount);
+                 if (this.canPlayerRaise(player)) {
+                      this.handleAction(player.id, this.currentBet === 0 ? 'bet' : 'raise', this.currentBet + betAmount);
+                  } else this.handleAction(player.id, 'check');
             } else { this.handleAction(player.id, 'check'); }
         } else { // Precisa dar Call, Fold ou Raise
             if (amountToCall >= player.chips) { // Call é All-in
@@ -977,12 +989,12 @@ class PokerGame {
             } else if (callCostPercentage > 15) { // Custo médio
                 const rand = Math.random();
                 if (rand < 0.3) this.handleAction(player.id, 'fold');
-                else if (rand < 0.85 && player.chips >= amountToCall + this.minRaise) this.handleAction(player.id, 'call');
-                else if (player.chips >= amountToCall + this.minRaise) {
+                else if (rand < 0.85 && this.canPlayerRaise(player) && player.chips >= amountToCall + this.minRaise) this.handleAction(player.id, 'call');
+                else if (this.canPlayerRaise(player) && player.chips >= amountToCall + this.minRaise) {
                      const totalRaise = this.currentBet + this.minRaise; this.handleAction(player.id, 'raise', totalRaise);
                 } else this.handleAction(player.id, 'call'); // Não pode raise, só call
             } else { // Custo baixo
-                if (player.chips >= amountToCall + this.minRaise && Math.random() < 0.15) {
+                if (this.canPlayerRaise(player) && player.chips >= amountToCall + this.minRaise && Math.random() < 0.15) {
                      const totalRaise = this.currentBet + this.minRaise; this.handleAction(player.id, 'raise', totalRaise);
                 } else this.handleAction(player.id, 'call');
             }
@@ -1001,16 +1013,23 @@ class PokerGame {
                     ? p.hand.map(card => card.toString())
                     : (p.hand.length > 0 ? p.hand.map(() => '?') : []),
                 currentBet: p.currentBet,
-                totalBetInRound: p.totalBetInRound, // Total APOSTADO NA RODADA ATUAL
+                totalBetInRound: p.totalBetInRound,
+                totalBetInHand: p.totalBetInHand,
+                canRaise: this.canPlayerRaise(p),
                 status: p.status,
                 isDealer: this.players[this.dealerButtonIndex]?.id === p.id,
-                isTurn: this.players[this.currentPlayerIndex]?.id === p.id && p.status === 'active',
+                isTurn: this.players[this.currentPlayerIndex]?.id === p.id && p.status === 'active' && !this._actionPending,
                 bestHandDescription: (this.currentPhase === 'showdown' && p.status !== 'folded' && p.status !== 'out' && p.evaluationResult?.description)
                                     ? p.evaluationResult.description
                                     : null
             })),
             communityCards: this.communityCards.map(card => card.toString()),
             pot: this.pot,
+            sidePots: (this.pot > 0 ? this._buildSidePots() : this._subPots).map(pot => ({
+                ...pot,
+                eligiblePlayerIds: [...pot.eligiblePlayerIds],
+                winnerIds: [...(pot.winnerIds || [])]
+            })),
             currentBet: this.currentBet, // Aposta a ser igualada
             minRaise: this.minRaise,     // Valor ADICIONAL mínimo para raise
             currentPhase: this.currentPhase,
@@ -1031,5 +1050,7 @@ class PokerGame {
 
 } // Fim da classe PokerGame
 
-// Exporta classes (opcional)
-// export { PokerGame, Card, Player };
+// Disponível também no Node para testes, sem alterar o carregamento no navegador.
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { PokerGame, Card, Player, Deck };
+}

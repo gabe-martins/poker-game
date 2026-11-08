@@ -10,7 +10,8 @@ A simple Texas Hold'em poker game playable in a web browser, built entirely with
 *   **Visual Interface:** A poker table layout created with CSS, showing player pods, chips, community cards, and player hands (human's visible, AI's hidden until showdown).
 *   **Action Controls:** Buttons for Fold, Check/Call, Bet/Raise, and an input field for bet amounts.
 *   **Quick Bet Buttons:** Buttons for quick betting actions (Min, 1/2 Pot, Pot, Max/All-in).
-*   **Simplified Hand Evaluation:** Includes basic logic to determine the winning hand at showdown (Note: Hand evaluation logic is currently simplified and might not cover all edge cases or complex comparisons perfectly).
+*   **Hand Evaluation:** Evaluates five-card combinations to select each player's best hand and compare kickers.
+*   **Side Pots:** Tracks contributions across all streets, resolves each pot independently, includes folded contributions, and refunds uncalled bets.
 *   **Rules Page:** A separate page (`rules.html`) explaining poker hand rankings and basic rules, with language switching between English and Portuguese.
 *   **No Dependencies:** Runs directly in the browser without needing any external libraries, frameworks, or build steps.
 
@@ -67,6 +68,22 @@ To get a local copy up and running, follow these simple steps.
     *   Click the "Regras do Jogo" (Game Rules) button in the top-right corner of the game page (`index.html`). This will open the `rules.html` page in a new browser tab.
     *   On the rules page, you can switch between English and Portuguese using the buttons provided.
 
+
+## Betting rules and tests
+
+Bet and raise amounts are **total contributions for the current street**, not additional chips.
+Facing a bet of 20, raising to 60 costs 60 if nothing has been invested, or 50 if the player already posted 10.
+The next minimum raise increment is 40. Short all-in raises preserve the last full increment and only reopen betting once the required increment has been reached.
+
+Side pots use each player's total contribution for the entire hand. Folded players contribute to pots but cannot win them. Ties are resolved separately for each pot; odd chips are awarded clockwise starting after the dealer.
+
+The game still runs without dependencies or a build step. To run the automated tests, install Node.js 20 or later:
+
+```bash
+npm test
+```
+
+The suite covers betting validation, blinds, all-ins, reopening raises, side pots, refunds, ties, actual-card showdowns, and chip conservation across simulated games. GitHub Actions runs it on pushes and pull requests.
 
 ## Contributing
 
