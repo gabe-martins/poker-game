@@ -68,8 +68,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    const CARD_BACK_SRC = '/static/images/cards/card_back.png';
-    const IMAGE_DIR = '/static/images/';
+    const CARD_BACK_SRC = 'static/images/cards/card_back.png';
+    const IMAGE_DIR = 'static/images/';
 
     // --- Instância do Jogo ---
     // As constantes BIG_BLIND_AMOUNT etc. vêm de poker-logic.js se ele as expor globalmente,
