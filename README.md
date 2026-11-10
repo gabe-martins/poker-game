@@ -85,6 +85,20 @@ npm test
 
 The suite covers betting validation, blinds, all-ins, reopening raises, side pots, refunds, ties, actual-card showdowns, card-aware decisions, hidden-information isolation, and chip conservation across simulated games. GitHub Actions runs it on pushes and pull requests.
 
+## Mobile interface
+
+The table adapts to phones from 320px wide, tablets, landscape orientation and desktop. On phones, three opponents sit above the community cards and your hand sits near the controls. Cards render locally using text and suit symbols, without downloading card images. Controls have at least 44px touch targets; the betting field has a numeric keyboard, visible limits and inline validation. Hand history is collapsible. All assets use paths compatible with GitHub Pages project hosting.
+
+Browser regression checks verify seven viewport sizes, overlapping players, horizontal overflow, hidden opponent cards, bet validation and completed raise actions:
+
+```bash
+python -m pip install -r tests/requirements.txt
+python -m playwright install chromium
+python tests/mobile-ui.py
+```
+
+Set `CHROMIUM_EXECUTABLE` to use a specific Chromium executable. Screenshots are saved in `/tmp/poker-mobile-preview/` and uploaded by the CI job.
+
 ## How the bots decide
 
 `static/js/poker-ai.js` contains the strategy separately from the game engine. Before the flop, a heuristic scores pairs, high cards, suited cards, connectivity, dealer position, and the number of live opponents.

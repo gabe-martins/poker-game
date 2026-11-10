@@ -3,18 +3,22 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web Poker</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Poker · Texas Hold’em</title>
+    <meta name="theme-color" content="#101b19">
+    <meta name="description" content="Jogue Texas Hold’em contra três bots, no celular ou computador, com fichas virtuais.">
     <link rel="stylesheet" href="static/css/style.css">
     <link rel="shortcut icon" href="static/images/icons/poker.svg" />
 </head>
 
 <body>
     <div id="game-container">
-        <a href="rules.html" target="_blank" id="rules-button" class="top-button">
-            Regras/Rules
-        </a>
-        <div id="poker-table">
+        <header class="app-header">
+            <div class="brand"><span class="brand-mark" aria-hidden="true">♠</span><div><h1>POKER</h1><p>Texas Hold’em</p></div></div>
+            <a href="rules.html" id="rules-button" class="top-button">Como jogar <span aria-hidden="true">›</span></a>
+        </header>
+        <div class="table-meta"><span>4 jogadores · Fichas virtuais</span><span id="phase-label">Pré-flop</span></div>
+        <div id="poker-table" role="region" aria-label="Mesa de poker">
             <!-- Áreas dos Jogadores -->
             <div class="player-area" id="player-0"> <!-- Humano (Bottom) -->
                 <div class="player-info">
@@ -57,7 +61,7 @@
 
             <!-- Centro da Mesa -->
             <div id="table-center">
-                <div id="pot">Pot: $<span>0</span></div>
+                <div id="pot">Pote · $<span>0</span></div>
                 <div id="community-cards">
                     <!-- Cartas comunitárias serão inseridas aqui -->
                 </div>
@@ -65,32 +69,39 @@
         </div>
 
         <!-- Controles do Jogador Humano -->
-        <div id="controls-container">
+        <section id="controls-container" aria-label="Suas jogadas">
+            <p id="turn-message" role="status" aria-live="polite">Preparando a mesa…</p>
+            <p class="quick-bet-label">Apostas rápidas · jogada imediata</p>
 
             <!-- Botões de Aposta Rápida -->
             <div id="quick-bet-controls" class="controls-disabled">
-                <button id="btn-min-bet" title="Aposta/Raise Mínimo">Min</button>
-                <button id="btn-half-pot" title="Metade do Pote">1/2 Pot</button>
-                <button id="btn-pot-bet" title="Tamanho do Pote">Pot</button>
-                <button id="btn-max-bet" title="All-in">All-in</button>
+                <button id="btn-min-bet" title="Aposta/Raise Mínimo">Mínimo</button>
+                <button id="btn-half-pot" title="Metade do Pote">½ pote</button>
+                <button id="btn-pot-bet" title="Tamanho do Pote">Pote</button>
+                <button id="btn-max-bet" title="Apostar todas as fichas">All-in</button>
             </div>
 
             <!-- Controles Principais -->
             <div id="action-controls" class="controls-disabled">
-                <button id="btn-fold">Fold</button>
-                <button id="btn-check-call">Check</button>
-                <button id="btn-bet-raise">Bet</button>
-                <input type="number" id="bet-amount" placeholder="Valor" min="0">
+                <button id="btn-fold">Desistir</button>
+                <button id="btn-check-call">Passar</button>
+                <button id="btn-bet-raise">Apostar</button>
+                <div class="bet-field"><label for="bet-amount">Aposta total nesta fase</label><input type="number" inputmode="numeric" id="bet-amount" placeholder="Valor" min="0" step="1" aria-describedby="min-raise-info action-error"></div>
                 <!-- O div min-raise-info pode ser mantido ou removido se não for mais usado -->
-                <div id="min-raise-info" style="display: none;"></div>
+                <p id="min-raise-info"></p>
+                <p id="action-error" role="alert"></p>
             </div>
 
-        </div> <!-- Fim do controls-container -->
+        </section> <!-- Fim do controls-container -->
 
         <!-- Log do Jogo -->
-        <div id="game-log">
+        <details id="history-panel">
+            <summary>Histórico da mesa</summary>
+        <div id="game-log" role="log" aria-label="Histórico da mesa">
             <p>Bem-vindo ao Poker!</p>
         </div>
+        </details>
+        <footer class="app-footer">Sem dinheiro real. Só uma boa partida.</footer>
     </div>
 
     <!-- Scripts -->

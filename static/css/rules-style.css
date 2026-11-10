@@ -227,3 +227,18 @@ body {
 .lang-pt {
     display: none;
 }
+
+/* O guia também precisa caber em telas pequenas e com zoom de texto. */
+#language-switcher button, .back-link { min-height: 44px; touch-action: manipulation; }
+@media (max-width: 600px) {
+    body { padding: 12px; }
+    .rules-card { width: 100%; padding: 20px 14px; }
+    #rules-content h1 { font-size: 1.5em; overflow-wrap: anywhere; }
+    .hand-ranking-item, .hand-text, .example-hand { min-width: 0; max-width: 100%; }
+    .example-hand { width: 100%; gap: 4px; }
+    .example-hand img { width: calc((100% - 16px) / 5); max-width: 52px; height: auto; margin: 0; }
+}
+@media (hover: none) {
+    .rules-card img:hover { scale: 1; }
+}
+

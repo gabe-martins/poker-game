@@ -68,8 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    const CARD_BACK_SRC = 'static/images/cards/card_back.png';
-    const IMAGE_DIR = 'static/images/';
+
 
     // --- Instância do Jogo ---
     // As constantes BIG_BLIND_AMOUNT etc. vêm de poker-logic.js se ele as expor globalmente,
@@ -90,30 +89,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Funções Auxiliares ---
 
-   /**
-     * Converte a string da carta (formato interno: 'AS', 'TD', 'KH') para o caminho da imagem.
-     */
-    function getCardImagePath(cardString) {
-        if (!cardString || cardString === '?') {
-            return CARD_BACK_SRC;
+    function createCard(cardString) {
+        const card = document.createElement('span');
+        card.className = 'playing-card';
+        card.setAttribute('role', 'img');
+        if (cardString === '?') {
+            card.classList.add('card-back');
+            card.setAttribute('aria-label', 'Carta virada');
+            return card;
         }
-        const rankMap = { 'A': 'ace', 'K': 'king', 'Q': 'queen', 'J': 'jack', 'T': '10', '9': '9', '8': '8', '7': '7', '6': '6', '5': '5', '4': '4', '3': '3', '2': '2' };
-        const suitMap = { 'S': 'spades', 'H': 'hearts', 'D': 'diamonds', 'C': 'clubs' };
-        if (typeof cardString !== 'string' || cardString.length !== 2) {
-            console.error(`getCardImagePath: Invalid card string format received: ${cardString}`);
-            return CARD_BACK_SRC;
+        const suits = { H: ['♥', 'copas'], D: ['♦', 'ouros'], C: ['♣', 'paus'], S: ['♠', 'espadas'] };
+        const rank = cardString[0] === 'T' ? '10' : cardString[0];
+        const suit = suits[cardString[1]];
+        card.classList.toggle('red-suit', ['H', 'D'].includes(cardString[1]));
+        card.setAttribute('aria-label', rank + ' de ' + suit[1]);
+        for (const [className, text] of [['card-corner', rank + suit[0]], ['card-suit', suit[0]], ['card-corner card-bottom', rank + suit[0]]]) {
+            const part = document.createElement('span');
+            part.className = className;
+            part.textContent = text;
+            part.setAttribute('aria-hidden', 'true');
+            card.appendChild(part);
         }
-        const rankChar = cardString[0];
-        const suitChar = cardString[1];
-        const rankFilenamePart = rankMap[rankChar];
-        const suitFilenamePart = suitMap[suitChar];
-        if (!rankFilenamePart || !suitFilenamePart) {
-            console.error(`getCardImagePath: Failed to map rank or suit. RankChar: ${rankChar}, SuitChar: ${suitChar} from cardString '${cardString}'`);
-            return CARD_BACK_SRC;
-        }
-        const filename = `${rankFilenamePart}_of_${suitFilenamePart}.png`;
-        return `${IMAGE_DIR}/cards/${filename}`;
+        return card;
     }
+
+    function showActionError(message) {
+        document.getElementById('action-error').textContent = message;
+        betAmountInput.setAttribute('aria-invalid', message ? 'true' : 'false');
+        if (message) betAmountInput.focus();
+    }
+    betAmountInput.addEventListener('input', () => showActionError(''));
 
     /**
      * Atualiza o log do jogo na interface.
@@ -155,7 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 elements.status.textContent = 'Eliminado';
                  elements.area.classList.add('is-folded');
             } else if (player.status === 'folded') {
-                 elements.status.textContent = 'Folded';
+                 elements.status.textContent = 'Desistiu';
                  elements.status.classList.add('folded');
                  elements.area.classList.add('is-folded');
             } else if (player.status === 'all-in') {
@@ -163,7 +168,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 elements.status.textContent = `All-in${totalInvested > 0 ? ' ($' + totalInvested + ')' : ''}`;
                 elements.status.classList.add('all-in');
             } else if (player.totalBetInRound > 0 && gameState.currentPhase !== 'showdown') {
-                elements.status.textContent = `Bet: $${player.totalBetInRound}`;
+                elements.status.textContent = `Aposta: $${player.totalBetInRound}`;
             }
             if (gameState.currentPhase === 'showdown' && player.status !== 'folded' && player.status !== 'out' && player.bestHandDescription) {
                  const currentStatus = elements.status.textContent;
@@ -173,16 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
             cardsContainer.innerHTML = '';
             if (player.hand && Array.isArray(player.hand)) {
                 player.hand.forEach(cardStr => {
-                    const img = document.createElement('img');
-                    const imagePath = getCardImagePath(cardStr);
-                    img.src = imagePath;
-                    img.alt = cardStr === '?' ? 'Card Back' : cardStr;
-                    img.onerror = () => {
-                        console.error(`Failed to load image: ${imagePath} (for card string: ${cardStr})`);
-                        img.alt = `Error loading ${cardStr}`;
-                        img.style.border = '2px solid red';
-                    };
-                    cardsContainer.appendChild(img);
+                    cardsContainer.appendChild(createCard(cardStr));
                 });
             } else if(player.status !== 'out') {
                  // console.warn(`Player ${index} (${player.name}) hand data is invalid or missing:`, player.hand);
@@ -194,16 +190,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Atualiza Cartas Comunitárias
         communityCardsDiv.innerHTML = '';
         gameState.communityCards.forEach(cardStr => {
-            const img = document.createElement('img');
-            const imagePath = getCardImagePath(cardStr);
-            img.src = imagePath;
-            img.alt = cardStr;
-            img.onerror = () => {
-                 console.error(`Failed to load community card image: ${imagePath} (for card string: ${cardStr})`);
-                 img.alt = `Error loading ${cardStr}`;
-                 img.style.border = '2px solid red';
-            };
-            communityCardsDiv.appendChild(img);
+            communityCardsDiv.appendChild(createCard(cardStr));
         });
 
         // Atualiza Pote
@@ -214,6 +201,20 @@ document.addEventListener('DOMContentLoaded', () => {
         if (humanPlayer) {
              const isHumanTurn = humanPlayer.isTurn;
              const canHumanAct = isHumanTurn && humanPlayer.status === 'active';
+             const phaseNames = { preflop: 'Pré-flop', flop: 'Flop', turn: 'Turn', river: 'River', showdown: 'Resultado', gameOver: 'Fim de jogo', idle: 'Preparando' };
+             document.getElementById('phase-label').textContent = phaseNames[gameState.currentPhase] || gameState.currentPhase;
+             const currentPlayer = gameState.players.find(p => p.isTurn);
+             const message = gameState.currentPhase === 'gameOver' ? 'Partida encerrada. Recarregue para jogar de novo.'
+                 : gameState.currentPhase === 'showdown' ? 'Resultado da mão · próxima mão em instantes'
+                 : humanPlayer.status === 'folded' ? 'Você desistiu. Acompanhe o restante da mão.'
+                 : humanPlayer.status === 'all-in' ? 'Você está all-in. Acompanhe a mesa.'
+                 : humanPlayer.status === 'out' ? 'Você foi eliminado. Acompanhe a partida.'
+                 : canHumanAct ? 'Sua vez. Escolha sua jogada.'
+                 : currentPlayer ? currentPlayer.name + ' está jogando…' : 'Aguarde a próxima jogada…';
+             document.getElementById('turn-message').textContent = message;
+             controlsContainer.classList.toggle('your-turn', canHumanAct);
+             if (!canHumanAct) showActionError('');
+
 
              // Habilita/Desabilita containers principais
              actionControlsDiv.classList.toggle('controls-disabled', !canHumanAct);
@@ -230,10 +231,10 @@ document.addEventListener('DOMContentLoaded', () => {
                  // Botão Check/Call
                  btnCheckCall.disabled = false;
                  if (canCheck) {
-                     btnCheckCall.textContent = 'Check';
+                     btnCheckCall.textContent = 'Passar';
                  } else {
                      const callAmount = Math.min(amountToCall, playerChips);
-                     btnCheckCall.textContent = `Call $${callAmount}`;
+                     btnCheckCall.textContent = `Pagar $${callAmount}`;
                      if (callAmount >= playerChips && callAmount > 0) {
                          btnCheckCall.textContent += ' (All-in)';
                      }
@@ -244,7 +245,7 @@ document.addEventListener('DOMContentLoaded', () => {
                  let minBetOrRaiseValue = 0; // Será calculado abaixo
 
                  if (gameState.currentBet === 0) { // Sem aposta aberta: BET
-                      btnBetRaise.textContent = 'Bet';
+                      btnBetRaise.textContent = 'Apostar';
                       // Mínimo para Bet: BB ou o minRaise atual (o que for maior), limitado pelo stack
                       minBetOrRaiseValue = Math.max(BIG_BLIND_AMOUNT, gameState.minRaise); // Precisa de BIG_BLIND_AMOUNT definido ou vindo do game state
                        if(playerChips < minBetOrRaiseValue && playerChips > 0) {
@@ -254,7 +255,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             canBetOrRaiseAction = false;
                        }
                  } else { // Precisa dar call, então a ação seria RAISE
-                      btnBetRaise.textContent = 'Raise';
+                      btnBetRaise.textContent = 'Aumentar';
                       // Mínimo para Raise: Aposta atual + minRaise adicional, limitado pelo stack
                       minBetOrRaiseValue = gameState.currentBet + gameState.minRaise;
                       if (playerChips < amountToCall + gameState.minRaise) { // Se não pode dar raise mínimo
@@ -273,9 +274,12 @@ document.addEventListener('DOMContentLoaded', () => {
                  btnBetRaise.disabled = !canBetOrRaiseAction;
                  betAmountInput.disabled = !canBetOrRaiseAction;
                  if(canBetOrRaiseAction) {
+                    betAmountInput.max = humanPlayer.chips + humanPlayer.totalBetInRound;
+                    minRaiseInfoDiv.textContent = 'Mínimo $' + minBetOrRaiseValue + ' · Máximo $' + betAmountInput.max;
                     betAmountInput.min = Math.max(0, minBetOrRaiseValue);
-                    betAmountInput.placeholder = `Valor (min ${Math.max(0, minBetOrRaiseValue)})`;
+                    betAmountInput.placeholder = '$' + Math.max(0, minBetOrRaiseValue);
                  } else {
+                      minRaiseInfoDiv.textContent = 'Aumento indisponível nesta jogada.';
                       betAmountInput.min = 0;
                       betAmountInput.placeholder = 'Valor';
                       betAmountInput.value = ''; // Limpa se desabilitado
@@ -302,12 +306,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
              } else {
+                 minRaiseInfoDiv.textContent = 'Os controles ficam disponíveis na sua vez.';
                  // Desabilita tudo se não for a vez
                  btnFold.disabled = true;
                  btnCheckCall.disabled = true;
-                 btnCheckCall.textContent = 'Check';
+                 btnCheckCall.textContent = 'Passar';
                  btnBetRaise.disabled = true;
-                 btnBetRaise.textContent = 'Bet';
+                 btnBetRaise.textContent = 'Apostar';
                  betAmountInput.disabled = true;
                  betAmountInput.value = '';
                  betAmountInput.placeholder = 'Valor';
@@ -376,19 +381,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Validações básicas (lógica principal de validação está no PokerGame)
             if (amount < minAllowed && humanPlayer.chips + humanPlayer.totalBetInRound > amount) { // Se for menor que min E não for all-in
-                alert(`O valor mínimo para esta ação é ${minAllowed}.`);
+                showActionError(`O valor mínimo é $${minAllowed}.`);
                 betAmountInput.value = minAllowed;
                 return;
             }
             const maxPossibleBet = humanPlayer.chips + humanPlayer.totalBetInRound;
              if (amount > maxPossibleBet) {
-                  alert(`Você só pode apostar no máximo ${maxPossibleBet} (all-in).`);
+                  showActionError(`Você pode apostar até $${maxPossibleBet} (all-in).`);
                   amount = maxPossibleBet;
                   betAmountInput.value = amount;
+                  return;
              }
 
              const isBetAction = game.currentBet === 0;
              const actionType = isBetAction ? 'bet' : 'raise';
+             showActionError('');
              game.performHumanAction(actionType, amount);
         }
     });

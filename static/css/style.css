@@ -1,478 +1,134 @@
-/* Reset básico e fontes */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+:root {
+    color-scheme: dark;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: #ecf2ec;
+    background: #101b19;
+    --muted: #a9bbb3;
+    --gold: #e5c47a;
 }
-
-body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* Fonte mais moderna */
-    background-color: #8b382b; /* Fundo vermelho/marrom escuro da imagem */
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
-    min-height: 100vh;
-    padding-top: 15px; /* Reduzido espaço no topo */
-    color: #f0f0f0; /* Texto padrão claro */
-}
-
-#game-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 100%;
-    max-width: 1000px; /* Limita largura máxima */
-    margin: 0 auto;
-}
-
-/* Estilos da Mesa */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { min-width: 280px; min-height: 100vh; min-height: 100svh; background: radial-gradient(ellipse at top, #243a31, #101b19 65%); }
+button, input, a, summary { -webkit-tap-highlight-color: transparent; }
+button, input { font: inherit; }
+button, a, summary { touch-action: manipulation; }
+button { cursor: pointer; }
+button:disabled { cursor: default; opacity: .42; }
+:focus-visible { outline: 3px solid var(--gold); outline-offset: 4px; }
+#game-container { width: min(100%, 1060px); margin: auto; padding: 0 24px; }
+.app-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 24px 0; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand-mark { color: var(--gold); font-size: 40px; line-height: 1; }
+.brand h1 { font-size: 20px; letter-spacing: .2em; font-weight: 700; }
+.brand p { font-size: 12px; color: var(--muted); margin-top: 3px; }
+#rules-button { display: inline-flex; align-items: center; gap: 12px; min-height: 44px; padding: 10px 14px; border: 1px solid #4c5c50; border-radius: 12px; text-decoration: none; color: #eee7d7; font-size: 13px; }
+.table-meta { display: flex; justify-content: space-between; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; padding: 0 4px 12px; }
+#phase-label { color: var(--gold); font-weight: 650; }
 #poker-table {
-    width: 100%;
-    max-width: 950px;
-    height: 350px; /* <<< ALTERADO: Aumenta a altura da mesa */
-    background: radial-gradient(ellipse at center, #2a9d47 0%, #007a21 70%, #005c18 100%);
-    border: 18px solid #4a2d21;
-    /* Ajusta border-radius se a proporção oval parecer estranha */
-    border-radius: 220px / 200px;
-    position: relative;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4), inset 0 0 25px rgba(0,0,0,0.3);
-    margin-bottom: 5rem;
-    margin-top: 4rem;
+    position: relative; isolation: isolate; display: grid;
+    grid-template-columns: 1fr 1.6fr 1fr; grid-template-rows: 150px 140px 180px;
+    grid-template-areas: ". north ." "west board east" ". hero .";
+    gap: 10px 20px; align-items: center; padding: 18px 28px;
 }
-
-/* Áreas dos Jogadores - Tentativa de Pods mais arredondados */
-.player-area {
-    position: absolute;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start; /* <<< ALTERADO: Alinha conteúdo no topo */
-    background: linear-gradient(145deg, #3a4a5a, #2c3a4a);
-    padding: 10px 10px 8px 10px; /* <<< ALTERADO: Aumentado padding superior */
-    border-radius: 45px;
-    min-width: 110px;
-    min-height: 105px; /* <<< AUMENTADO: Altura mínima maior */
-    transition: box-shadow 0.3s ease, background-color 0.3s ease;
-    border: 3px solid #6c757d;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-    z-index: 10;
+#poker-table::before { content: ""; position: absolute; z-index: -1; inset: 35px 12px; border: 10px solid #394437; border-radius: 45%; background: radial-gradient(ellipse, #275a44, #183e30); box-shadow: 0 0 0 1px #77826755, inset 0 0 45px #061e17aa, 0 14px 40px #0004; }
+.player-area { position: relative; justify-self: center; width: 150px; max-width: 100%; text-align: center; padding: 10px; background: #14251ff2; border: 1px solid #526357; border-radius: 16px; transition: border-color .2s, box-shadow .2s; }
+#player-0 { grid-area: hero; width: 190px; border-color: #8b865d; }
+#player-1 { grid-area: west; }
+#player-2 { grid-area: north; }
+#player-3 { grid-area: east; }
+.player-info { position: relative; min-width: 0; }
+.player-name { font-size: 13px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.player-chips { color: var(--gold); font-size: 14px; font-weight: 650; font-variant-numeric: tabular-nums; margin: 3px 0; }
+.player-status { color: #becdc3; font-size: 11px; line-height: 1.3; min-height: 15px; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.player-status.all-in { color: var(--gold); }
+.is-turn { border-color: var(--gold); box-shadow: 0 0 0 3px #e5c47a2e, 0 0 24px #e5c47a18; }
+.is-folded { opacity: .55; }
+.dealer-button { position: absolute; right: -4px; top: -17px; display: flex; justify-content: center; align-items: center; height: 22px; width: 22px; border-radius: 50%; color: #15271d; background: #e7e4d5; font-size: 11px; font-weight: 800; border: 2px solid #a5ac93; }
+.player-cards { display: flex; justify-content: center; gap: 5px; margin-top: 8px; }
+.playing-card { position: relative; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 45px; aspect-ratio: 5 / 7; color: #192d29; background: #fcfaf2; border: 1px solid #ddd9c9; border-radius: 6px; box-shadow: 0 3px 5px #0003; font-family: Georgia, "Times New Roman", serif; }
+.red-suit { color: #bb303a; }
+.card-corner { position: absolute; left: 4px; top: 3px; font-size: 12px; font-weight: bold; letter-spacing: -.06em; line-height: 1; }
+.card-bottom { top: auto; left: auto; bottom: 3px; right: 4px; transform: rotate(180deg); }
+.card-suit { font-size: 27px; }
+.card-back { border: 3px solid #d7dfce; background: repeating-linear-gradient(45deg, #355d4f 0 3px, #28493e 3px 6px); }
+.card-back::after { content: "♠"; color: #d6c891; font-size: 25px; border: 1px solid #d6c89166; width: 80%; height: 85%; display: grid; place-items: center; border-radius: 3px; }
+#player-0 .playing-card { width: 57px; }
+#player-0 .card-corner { font-size: 14px; }
+#player-0 .card-suit { font-size: 33px; }
+#table-center { grid-area: board; display: flex; flex-direction: column; align-items: center; min-width: 0; width: 100%; gap: 12px; }
+#pot { font-size: 12px; color: #c5d1c5; font-weight: 500; letter-spacing: .03em; }
+#pot span { color: #fff4cf; font-size: 23px; font-weight: 700; font-variant-numeric: tabular-nums; }
+#community-cards { display: flex; justify-content: center; gap: 5px; width: 100%; min-height: 81px; align-items: center; }
+#community-cards:empty::before { content: "Aguardando o flop"; color: #a2b9a9; font-size: 12px; letter-spacing: .02em; }
+#community-cards .playing-card { width: min(17%, 54px); }
+#controls-container { max-width: 640px; margin: 18px auto 0; padding: 16px; border: 1px solid #405146; border-radius: 18px; background: #192922; }
+#turn-message { font-size: 14px; line-height: 1.4; color: #c9d4cb; min-height: 20px; margin-bottom: 14px; }
+.your-turn #turn-message { color: #f2d99e; }
+.your-turn #turn-message::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--gold); margin-right: 8px; vertical-align: 1px; }
+.quick-bet-label { font-size: 11px; color: var(--muted); margin-bottom: 7px; }
+#quick-bet-controls { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; }
+#quick-bet-controls button { min-width: 0; min-height: 44px; border-radius: 9px; border: 1px solid #516255; background: #293d31; color: #eee8da; font-size: 13px; }
+#action-controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+#action-controls button { min-width: 0; min-height: 50px; border-radius: 10px; border: 1px solid transparent; font-size: 14px; font-weight: 650; padding: 9px 4px; overflow-wrap: anywhere; }
+#btn-fold { background: #3a2728; color: #fac3bf; border-color: #714341 !important; }
+#btn-check-call { background: #30483a; color: #eff2dd; border-color: #60775d !important; }
+#btn-bet-raise { background: var(--gold); color: #20291c; }
+.bet-field { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr minmax(85px, 35%); align-items: center; gap: 12px; margin-top: 5px; }
+.bet-field label { font-size: 12px; color: #bdccc1; }
+#bet-amount { width: 100%; min-width: 0; min-height: 46px; border-radius: 9px; border: 1px solid #5e705f; background: #0e1b16; color: #fff2cc; text-align: center; font-size: 16px; padding: 8px; }
+#bet-amount[aria-invalid="true"] { border-color: #f5aaa1; }
+#min-raise-info, #action-error { grid-column: 1 / -1; font-size: 11px; color: #acbeb0; line-height: 1.4; }
+#action-error { color: #ffb5a7; font-size: 12px; }
+#action-error:empty { display: none; }
+#history-panel { max-width: 640px; margin: 16px auto 0; border: 1px solid #34473c; border-radius: 12px; }
+#history-panel summary { cursor: pointer; min-height: 48px; padding: 14px 16px; color: #b7c7bc; font-size: 13px; }
+#game-log { height: 160px; overflow-y: auto; padding: 0 16px 16px; font-size: 12px; color: #b8c8be; line-height: 1.6; overscroll-behavior: contain; }
+#game-log p { padding: 5px 0; border-bottom: 1px solid #34473c; }
+.app-footer { text-align: center; font-size: 11px; color: #829b8c; padding: 22px 0 max(22px, env(safe-area-inset-bottom)); }
+@media (hover: hover) and (pointer: fine) {
+    button:not(:disabled):hover, #rules-button:hover { filter: brightness(1.13); }
 }
-
-.player-info {
-    text-align: center;
-    color: #fff;
-    margin-bottom: 8px;
-    font-size: 0.8em;
-    position: relative;
-    line-height: 1.2;
-    width: 100%; /* Garante que ocupe a largura para centralizar texto */
+@media (max-width: 600px) {
+    #game-container { padding: 0 max(12px, env(safe-area-inset-left)) 0 max(12px, env(safe-area-inset-right)); }
+    .app-header { padding: max(14px, env(safe-area-inset-top)) 2px 16px; }
+    .brand-mark { font-size: 32px; }
+    .brand h1 { font-size: 17px; }
+    #rules-button { font-size: 12px; padding: 9px 12px; }
+    .table-meta { font-size: 11px; padding-bottom: 8px; }
+    #poker-table { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: 120px 115px 145px; grid-template-areas: "west north east" "board board board" "hero hero hero"; gap: 8px; padding: 12px 8px; }
+    #poker-table::before { inset: 32px 0 12px; border-width: 6px; border-radius: 90px; }
+    .player-area { width: 100%; padding: 8px 3px; border-radius: 12px; }
+    .player-name { font-size: 12px; }
+    .player-chips { font-size: 13px; }
+    .player-status { font-size: 10px; min-height: 13px; }
+    .player-cards { gap: 4px; margin-top: 6px; }
+    .player-cards .playing-card { width: clamp(29px, 8.5vw, 38px); }
+    .player-cards .card-corner { font-size: 10px; left: 2px; top: 2px; }
+    .player-cards .card-bottom { top: auto; left: auto; right: 2px; bottom: 2px; }
+    .player-cards .card-suit { font-size: 23px; }
+    #player-0 { width: 176px; padding: 8px 14px; }
+    #player-0 .playing-card { width: 53px; }
+    #player-0 .card-corner { font-size: 13px; }
+    #player-0 .card-suit { font-size: 32px; }
+    .dealer-button { right: 0; top: -17px; }
+    #table-center { gap: 7px; padding: 0 8px; }
+    #community-cards { min-height: 73px; gap: 5px; }
+    #community-cards .playing-card { width: min(17%, 52px); }
+    #controls-container { margin-top: 8px; padding: 13px 12px; border-radius: 15px; }
+    #turn-message { font-size: 13px; margin-bottom: 10px; }
+    #quick-bet-controls { gap: 6px; margin-bottom: 10px; }
+    #action-controls { gap: 7px; }
+    #action-controls button { font-size: 13px; }
+    .app-footer { padding-top: 18px; }
 }
-
-.player-name {
-    font-weight: bold;
-    margin-bottom: 2px;
-    white-space: nowrap; /* Evita quebra de linha */
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 100px;
+@media (max-width: 350px) {
+    #game-container { padding-left: 8px; padding-right: 8px; }
+    #poker-table { gap: 6px; padding-left: 4px; padding-right: 4px; }
+    #controls-container { padding-left: 10px; padding-right: 10px; }
+    #action-controls button { font-size: 12px; }
 }
-
-.player-chips {
-    color: #ffd700; /* Dourado mantido */
-    font-weight: bold;
-    margin-bottom: 0.8rem;
+@media (max-height: 500px) and (min-width: 601px) {
+    .app-header { padding: 10px 0; }
 }
-
-.player-status {
-    font-style: italic;
-    font-size: 0.75em;
-    min-height: 1em;
-    color: #adb5bd; /* Cinza claro */
-    margin-top: 2px;
-}
-.player-status.folded {
-    color: #6c757d;
-}
-.player-status.all-in {
-    color: #ffc107; /* Amarelo mais vibrante */
-    font-weight: bold;
-}
-
-#player-0 { /* Humano - Bottom */
-    bottom: 0; /* Alinha base do pod com base da mesa */
-    left: 50%;
-    transform: translateX(-50%) translateY(50%);
-}
-
-#player-1 { /* AI 1 - Left */
-    top: 50%; /* Alinha topo do pod com centro vertical da mesa */
-    transform: translateY(-50%) translateX(-50%) rotate(15deg);
-}
-
-#player-2 { /* AI 2 - Top */
-    top: 0; /* Alinha topo do pod com topo da mesa */
-    left: 50%;
-    transform: translateX(-50%) translateY(-50%);
-}
-
-#player-3 { /* AI 3 - Right */
-    top: 50%; /* Alinha topo do pod com centro vertical da mesa */
-    right: 0; /* Alinha direita do pod com direita da mesa */
-    transform: translateY(-50%) translateX(50%) rotate(-15deg);
-}
-
-/* Destaque de Turno */
-.player-area.is-turn {
-    box-shadow: 0 0 15px 6px #ffeb3b; /* Amarelo mais forte */
-    border-color: #ffeb3b;
-    background: linear-gradient(145deg, #4e5a68, #3a4a58); /* Fundo levemente mais claro no turno */
-}
-.player-area.is-folded {
-    opacity: 0.65;
-    filter: grayscale(50%); /* Efeito adicional para fold */
-}
-
-/* Cartas */
-.player-cards { /* Container das cartas do jogador */
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: auto;
-    margin-top: 5px; /* <<< ADICIONADO/ALTERADO: Espaço acima das cartas */
-    position: relative; /* <<< GARANTIR que esteja presente */
-    height: calc(6rem * 0.7);
-    width: 100%; /* Ocupa largura para centralizar cartas */
-}
-
-#community-cards { /* Container das cartas comunitárias */
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: calc(6rem + 10px); /* Altura para comportar cartas + margem */
-    margin-bottom: 1rem;
-}
-
-/* Estilos unificados para TODAS as cartas */
-.player-cards img,
-#community-cards img {
-    height: 6.2rem;       /* Tamanho definido pelo usuário */
-    width: auto;
-    margin: 0; /* Reset margin */
-    border-radius: 6px; /* Raio ajustado */
-    background-color: white;
-    box-shadow: 2px 2px 6px rgba(0,0,0,0.45);
-    vertical-align: middle;
-    transition: transform 0.2s ease; /* Animação suave */
-}
-
-/* Sobreposição das cartas do jogador */
-.player-cards img {
-    position: absolute; /* Permite sobreposição */
-    bottom: 0; /* Alinha na base do container */
-}
-.player-cards img:first-child {
-    transform: translateX(-35%) rotate(-8deg); /* Move para esquerda e rotaciona */
-    z-index: 1; /* Fica embaixo */
-}
-.player-cards img:last-child {
-    transform: translateX(35%) rotate(8deg); /* Move para direita e rotaciona */
-    z-index: 2; /* Fica em cima */
-}
-
-#player-0 .player-cards img:hover {
-    scale: 1.5;
-}
-
-/* Espaçamento das cartas comunitárias */
-#community-cards img {
-    margin: 0 5px; /* Espaçamento horizontal */
-}
-
-#community-cards img:hover {
-    scale: 1.5;
-}
-
-
-/* Centro da Mesa */
-#table-center {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 70%;
-}
-
-#pot {
-    background-color: rgba(0, 0, 0, 0.1);
-    color: #fff;
-    padding: 6px 18px;
-    border-radius: 20px;
-    margin-top: 1rem;
-    /* margin-bottom: 1px; */
-    font-size: 1.1em;
-    font-weight: bold;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
-}
-#pot span {
-    color: #fff; /* Dourado mantido */
-    font-weight: bold;
-    margin-left: 5px;
-}
-
-/* Botão Dealer - Posicionado perto do pod, sobre a mesa */
-.dealer-button {
-    position: absolute;
-    top: 50%;              /* Centraliza verticalmente no pod */
-    right: -30px;          /* Empurra para fora do lado direito */
-    transform: translateY(-50%); /* Ajuste fino vertical */
-    width: 22px;
-    height: 22px;
-    background-color: #fff;
-    color: #333;
-    border: 2px solid #888;
-    border-radius: 50%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-weight: bold;
-    font-size: 0.9em;
-    box-shadow: 1px 1px 3px rgba(0,0,0,0.4);
-    z-index: 11; /* <<< AUMENTADO: Garante que fique sobre a borda da mesa se necessário */
-}
-
-/* Controles de Ação - Estilo mais próximo da imagem */
-/* Container para todos os controles */
-#controls-container {
-    display: flex;
-    flex-direction: column; /* Empilha verticalmente */
-    align-items: center;
-    width: 100%;
-    max-width: 600px; /* Ou a largura desejada */
-    margin-top: 10px; /* Espaço acima dos controles */
-}
-
-/* Container dos Botões Rápidos */
-#quick-bet-controls {
-    display: flex;
-    justify-content: center;
-    gap: 8px; /* Espaço entre botões rápidos */
-    margin-bottom: 12px; /* Espaço abaixo dos botões rápidos */
-    width: 100%;
-    transition: opacity 0.3s ease;
-}
-
-/* Classe para desabilitar container rápido */
-#quick-bet-controls.controls-disabled {
-    opacity: 0.5;
-    pointer-events: none;
-}
-
-/* Estilo dos Botões Rápidos */
-#quick-bet-controls button {
-    padding: 5px 10px; /* Menores que os principais */
-    font-size: 0.85em; /* Fonte menor */
-    font-weight: bold;
-    cursor: pointer;
-    border: none;
-    border-radius: 5px;
-    color: white;
-    /* Cinza escuro como base, pode ajustar */
-    background: linear-gradient(180deg, #6c757d, #495057);
-    min-width: 55px; /* Largura mínima */
-    text-shadow: 1px 1px 1px rgba(0,0,0,0.4);
-    box-shadow: 0 2px 3px rgba(0,0,0,0.3);
-    transition: background-color 0.2s ease, transform 0.1s ease;
-}
-
-#quick-bet-controls button:hover {
-    filter: brightness(1.15);
-    transform: translateY(-1px);
-}
-
-#quick-bet-controls button:active {
-    transform: translateY(0px);
-    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
-}
-
-/* Estilo quando botão rápido está desabilitado */
-#quick-bet-controls button:disabled {
-     background: #5a6268 !important; /* Cor mais apagada */
-     color: #adb5bd !important;
-     cursor: not-allowed;
-     box-shadow: none;
-     transform: none;
-     filter: grayscale(30%);
-}
-
-/* Ajuste no container de ações principais se necessário */
-#action-controls {
-    /* Se tinha margin-top, remova ou ajuste pois agora tem o container pai */
-    /* margin-top: 10px; */
-     width: 100%; /* Garante que ocupe a largura do container pai */
-     /* Resto dos estilos de #action-controls permanecem */
-}
-
-/* Oculta a info de min-raise se não estiver usando */
-#min-raise-info {
-    display: none;
-}
-
-#action-controls.controls-disabled {
-    opacity: 0.5;
-    pointer-events: none;
-}
-
-#action-controls button {
-    padding: 12px 20px; /* Mais padding */
-    font-size: 1.2em; /* Fonte maior */
-    font-weight: bold;
-    cursor: pointer;
-    border: none;
-    border-radius: 8px; /* Bordas arredondadas */
-    color: white;
-    text-transform: uppercase; /* Texto em maiúsculas */
-    min-width: 120px; /* Largura mínima */
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
-    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-    transition: background-color 0.2s ease, transform 0.1s ease;
-    flex-grow: 1; /* Permite que cresçam */
-    flex-basis: 0; /* Base flex para distribuição igual */
-}
-#action-controls button:hover {
-    filter: brightness(1.1); /* Efeito de brilho no hover */
-    transform: translateY(-1px); /* Leve levantada */
-}
-#action-controls button:active {
-    transform: translateY(1px); /* Efeito de clique */
-    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-}
-
-#action-controls button:disabled {
-    background-color: #6c757d !important; /* Cor desabilitada (importante para sobrescrever) */
-    color: #adb5bd !important;
-    cursor: not-allowed;
-    box-shadow: none;
-    transform: none;
-    filter: grayscale(40%);
-}
-
-
-/* Cores específicas dos botões */
-#action-controls #btn-fold {
-    background: linear-gradient(180deg, #e74c3c, #c0392b); /* Gradiente vermelho */
-}
-#action-controls #btn-check-call {
-    background: linear-gradient(180deg, #3498db, #2980b9); /* Gradiente azul/ciano */
-    /* O texto será ajustado via JS se for 'Call' */
-}
-#action-controls #btn-bet-raise {
-    background: linear-gradient(180deg, #2ecc71, #27ae60); /* Gradiente verde */
-}
-
-/* Input de aposta e info - Menos proeminente */
-#action-controls input[type="number"] {
-    padding: 10px;
-    width: 100px; /* Largura fixa */
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    font-size: 1.1em;
-    text-align: center;
-    background-color: #eee;
-    color: #333;
-    flex-grow: 0; /* Não cresce */
-    flex-shrink: 0; /* Não encolhe */
-}
-#action-controls input[type=number]::-webkit-outer-spin-button,
-#action-controls input[type=number]::-webkit-inner-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-}
-#action-controls input[type=number] {
-    -moz-appearance: textfield;
-}
-
-#min-raise-info {
-    display: none; /* Oculta a informação de min raise por padrão */
-    /* Pode ser re-habilitada e estilizada se necessário */
-    /* position: absolute; */
-    /* bottom: -20px; */
-    /* font-size: 0.8em; */
-    /* color: #ccc; */  
-}
-
-/* Log do Jogo */
-#game-log {
-    margin-top: 2rem;
-    margin-bottom: 3rem;
-    width: 90%;
-    max-width: 850px;
-    height: 10rem; /* Reduzido */
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    background-color: rgba(0, 0, 0, 0.4); /* Fundo escuro semi-transparente */
-    color: #e0e0e0; /* Texto claro */
-    padding: 8px;
-    overflow-y: scroll;
-    font-size: 0.85em;
-    line-height: 1.4;
-    border-radius: 4px;
-}
-#game-log p {
-    margin-bottom: 4px;
-    border-bottom: 1px dotted rgba(255, 255, 255, 0.2);
-    padding-bottom: 3px;
-}
-#game-log p:last-child {
-    border-bottom: none;
-    margin-bottom: 0;
-}
-
-/* Scrollbar customizada para o log (Webkit) */
-#game-log::-webkit-scrollbar {
-    width: 8px;
-}
-#game-log::-webkit-scrollbar-track {
-    background: rgba(0,0,0,0.2);
-    border-radius: 4px;
-}
-#game-log::-webkit-scrollbar-thumb {
-    background-color: rgba(255, 255, 255, 0.3);
-    border-radius: 4px;
-    border: 2px solid transparent;
-    background-clip: content-box;
-}
-#game-log::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(255, 255, 255, 0.5);
-}
-
-/* Estilo para o botão/link de regras */
-#rules-button.top-button {
-    display: inline-block; /* Permite padding, margin, etc. */
-    position: absolute;    /* Posicionamento absoluto em relação ao pai mais próximo (ou body) */
-    top: 10px;            /* Distância do topo */
-    right: 20px;           /* Distância da direita */
-    padding: 8px 15px;
-    background-color: #ffc107; /* Cor amarela/dourada */
-    color: #333;          /* Texto escuro */
-    text-decoration: none;
-    font-weight: bold;
-    font-size: 0.9em;
-    border-radius: 5px;
-    border: 1px solid #e0a800; /* Borda um pouco mais escura */
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    transition: background-color 0.2s ease, transform 0.1s ease;
-    z-index: 100; /* Garante que fique acima de outros elementos */
-}
-
-#rules-button.top-button:hover {
-    background-color: #e0a800; /* Escurece no hover */
-    color: #212529;
-    transform: translateY(-1px);
-}
-
-#rules-button.top-button:active {
-    transform: translateY(0px);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; }
 }
